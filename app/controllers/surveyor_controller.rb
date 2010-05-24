@@ -25,9 +25,22 @@ class SurveyorController < ApplicationController
     redirect_to surveyor_default(:index) unless available_surveys_path == surveyor_default(:index)
   end
 
+  # def create
+  #   @survey = Survey.find_by_access_code(params[:survey_code])
+  #   @response_set = ResponseSet.create(:survey => @survey, :user_id => (@current_user.nil? ? @current_user : @current_user.id))
+  #   if (@survey && @response_set)
+  #     flash[:notice] = "Survey was successfully started."
+  #     redirect_to(edit_my_survey_path(:survey_code => @survey.access_code, :response_set_code  => @response_set.access_code))
+  #   else
+  #     flash[:notice] = "Unable to find that survey"
+  #     redirect_to(available_surveys_path)
+  #   end
+  # end
+  
   def create
     @survey = Survey.find_by_access_code(params[:survey_code])
-    @response_set = ResponseSet.create(:survey => @survey, :user_id => (@current_user.nil? ? @current_user : @current_user.id))
+    # debugger
+    @response_set = ResponseSet.create(:survey => @survey, :user_id => (@current_user.nil? ? @current_user : @current_user.id), :user_type => @current_user.class.to_s )
     if (@survey && @response_set)
       flash[:notice] = "Survey was successfully started."
       redirect_to(edit_my_survey_path(:survey_code => @survey.access_code, :response_set_code  => @response_set.access_code))
@@ -81,9 +94,9 @@ class SurveyorController < ApplicationController
       end
 
       if params[:responses] or params[:response_groups]
+        #debugger
         @response_set.clear_responses
-        saved = @response_set.update_attributes(:response_attributes => (params[:responses] || {}).dup ,
-                                                :response_group_attributes => (params[:response_groups] || {}).dup) #copy (dup) to preserve params because we manipulate params in the response_set methods
+        saved = response_set_update(@response_set, params)
         if (saved && params[:finish])
           @response_set.complete!
           saved = @response_set.save!
@@ -92,12 +105,17 @@ class SurveyorController < ApplicationController
     end
     respond_to do |format|
       format.html do
-        if saved && params[:finish]
-          flash[:notice] = "Completed survey"
-          redirect_to surveyor_default(:finish)
+        if answer_check(params)
+          if saved && params[:finish]
+            flash[:notice] = "Completed survey"
+            redirect_to surveyor_default(:finish)
+          else
+            flash[:notice] = "Unable to update survey" if !saved #and !saved.nil? # saved.nil? is true if there are no questions on the page (i.e. if it only contains a label)
+            redirect_to :action => "edit", :anchor => anchor_from(params[:section]), :params => {:section => section_id_from(params[:section])}
+          end
         else
-          flash[:notice] = "Unable to update survey" if !saved #and !saved.nil? # saved.nil? is true if there are no questions on the page (i.e. if it only contains a label)
-          redirect_to :action => "edit", :anchor => anchor_from(params[:section]), :params => {:section => section_id_from(params[:section])}
+          flash[:notice] = "You didn't answer the question"
+          redirect_to :action => "edit", :anchor => anchor_from(params[:section]), :params => {:section => params[:current_section_id]}
         end
       end
       # No redirect needed if we're talking to the page via json
@@ -108,10 +126,26 @@ class SurveyorController < ApplicationController
   end
 
   private
+  
+  def response_set_update(response_set, params)
+    #copy (dup) to preserve params because we manipulate params in the response_set methods
+    response_set.update_attributes(
+      :response_attributes => (params[:responses] || {}).dup , 
+      :response_group_attributes => (params[:response_groups] || {}).dup)
+  end
+  
+  def answer_check(params)
+    params[:responses].first[1].has_key?("answer_id")
+  end
 
   # Filters
   def get_current_user
-    @current_user = self.respond_to?(:current_user) ? self.current_user : nil
+    # @current_user = self.respond_to?(:current_user) ? self.current_user : nil
+    if student_signed_in?
+      @current_user = current_student
+    elsif teacher_signed_in?
+      @current_user = current_teacher
+    end
   end
 
   # Params: the name of some submit buttons store the section we'd like to go to. for repeater questions, an anchor to the repeater group is also stored
