@@ -114,7 +114,7 @@ class SurveyorController < ApplicationController
             redirect_to :action => "edit", :anchor => anchor_from(params[:section]), :params => {:section => section_id_from(params[:section])}
           end
         else
-          flash[:notice] = "You didn't answer the question"
+          flash[:notice] = "You didn't answer all the questions on this page."
           redirect_to :action => "edit", :anchor => anchor_from(params[:section]), :params => {:section => params[:current_section_id]}
         end
       end
@@ -135,6 +135,9 @@ class SurveyorController < ApplicationController
   end
   
   def answer_check(params)
+    if params[:section] && params[:section].first.detect{|s| s.include?("Previous")}
+      return true
+    end
     params[:responses].first[1].has_key?("answer_id")
   end
 
