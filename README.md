@@ -1,3 +1,7 @@
+**Note** This fork of Breakpointer's Surveyor is modified for a specific use case. 
+Questions are meant to be answered consecutively, and every question is required to be answered.
+
+
 # Survey On Rails
 
 Surveyor is a rails (gem) plugin, that brings surveys to your rails app. Before Rails 2.3, it was implemented as a Rails Engine. Surveys are written in a DSL (Domain Specific Language), with examples available in the "kitchen sink" survey.
